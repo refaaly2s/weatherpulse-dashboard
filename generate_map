@@ -1,0 +1,78 @@
+import urllib.request
+import json
+
+cities = [
+    {"name": "Riyadh", "lat": 24.7136, "lon": 46.6753},
+    {"name": "Buraydah", "lat": 26.3260, "lon": 43.9750},
+    {"name": "Jeddah", "lat": 21.4858, "lon": 39.1925},
+    {"name": "Dammam", "lat": 26.4207, "lon": 50.0888},
+]
+
+features = []
+for city in cities:
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={city['lat']}&longitude={city['lon']}&current=temperature_2m,wind_speed_10m,precipitation"
+    try:
+        response = urllib.request.urlopen(url, timeout=10)
+        data = json.loads(response.read())
+        current = data['current']
+        features.append({
+            "name": city["name"],
+            "lat": city["lat"],
+            "lon": city["lon"],
+            "temp": current["temperature_2m"],
+            "wind": current["wind_speed_10m"],
+            "precip": current["precipitation"]
+        })
+    except Exception as e:
+        print(f"Error fetching {city['name']}: {e}")
+
+# بناء ملف HTML بخريطة Leaflet بسيطة
+html = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>WeatherPulse Live Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  body { margin:0; font-family: Arial, sans-serif; }
+  #map { height: 100vh; }
+  .info-box { position: absolute; top: 10px; left: 50px; z-index: 1000;
+              background: white; padding: 10px 20px; border-radius: 8px;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-size: 16px; }
+</style>
+</head>
+<body>
+<div class="info-box">🌡️ WeatherPulse — لوحة رصد الطقس الحي</div>
+<div id="map"></div>
+<script>
+var map = L.map('map').setView([24.7136, 45.0], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+var cities = """ + json.dumps(features, ensure_ascii=False) + """;
+
+cities.forEach(function(c) {
+    var color = c.temp > 35 ? 'red' : c.temp > 25 ? 'orange' : 'blue';
+    var marker = L.circleMarker([c.lat, c.lon], {
+        radius: 8 + c.wind/2,
+        fillColor: color,
+        color: '#333',
+        weight: 1,
+        fillOpacity: 0.8
+    }).addTo(map);
+    marker.bindPopup(
+        '<b>' + c.name + '</b><br>' +
+        'الحرارة: ' + c.temp + '°C<br>' +
+        'الرياح: ' + c.wind + ' km/h<br>' +
+        'الأمطار: ' + c.precip + ' mm'
+    );
+});
+</script>
+</body>
+</html>
+"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html)
+
+print("تم إنشاء index.html بنجاح!")
